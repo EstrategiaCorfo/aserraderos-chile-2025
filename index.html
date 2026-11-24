@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Mapa interactivo y directorio de la industria del aserrío de Chile. Explora el Catastro 2025 por región, comuna y situación operativa.">
+  <meta name="theme-color" content="#17183b">
+  <title>Aserraderos de Chile · Catastro 2025</title>
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="vendor/markercluster.css">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="vendor/leaflet.js"></script>
+  <script defer src="vendor/leaflet.markercluster.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#mapa">Ir a los filtros y el mapa</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#inicio">
+        <img src="assets/logo-corfo-blanco.png" width="87" height="28" alt="Corfo">
+        <span class="brand-text"><strong>Visor de aserraderos</strong><small>Catastro 2025</small></span>
+      </a>
+      <nav aria-label="Navegación del visor">
+        <a href="#mapa" aria-current="location">Mapa</a>
+        <a href="#directorio">Directorio</a>
+        <a href="#fuentes">Fuentes</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="layout" id="inicio">
+    <section class="intro" aria-labelledby="titulo">
+      <p class="eyebrow">Industria forestal primaria · Catastro 2025</p>
+      <h1 id="titulo">Aserraderos de Chile</h1>
+      <p>Los aserraderos transforman trozas en madera aserrada y pueden operar como plantas permanentes o equipos móviles. El catastro del Instituto Forestal abarca 11 regiones, desde Valparaíso hasta Magallanes.</p>
+    </section>
+
+    <section id="mapa" aria-label="Filtros y mapa">
+      <form class="filters" id="filters" aria-label="Filtros del directorio" autocomplete="off">
+        <div class="filter-grid">
+          <label class="search-field">
+            <span>Buscar aserradero</span>
+            <span class="search-input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
+              <input id="query" name="query" type="search" placeholder="Nombre, comuna o ID">
+            </span>
+          </label>
+          <label>
+            <span>Región</span>
+            <span class="select-wrap"><select id="region" name="region"><option value="">Todas</option></select></span>
+          </label>
+          <label>
+            <span>Comuna</span>
+            <span class="select-wrap"><select id="comuna" name="comuna"><option value="">Todas</option></select></span>
+          </label>
+          <label>
+            <span>Situación</span>
+            <span class="select-wrap"><select id="situacion" name="situacion"><option value="">Todas</option><option>Trabajando</option><option>Paralizado</option></select></span>
+          </label>
+          <label>
+            <span>Movilidad</span>
+            <span class="select-wrap"><select id="movilidad" name="movilidad"><option value="">Todas</option><option>Móvil</option><option>Permanente</option></select></span>
+          </label>
+          <label>
+            <span>Revisión geográfica</span>
+            <span class="select-wrap">
+              <select id="revision" name="revision">
+                <option value="">Todos</option>
+                <option value="revisar">Requiere revisión</option>
+                <option value="sin-alerta">Sin observación</option>
+                <option value="no-mapeable">Sin punto en mapa</option>
+              </select>
+            </span>
+          </label>
+          <button class="primary-button" id="reset-filters" type="button" disabled>Limpiar filtros</button>
+        </div>
+        <div class="active-filters">
+          <span>Filtros activos</span>
+          <div id="active-filters">Ninguno</div>
+        </div>
+      </form>
+
+      <section class="summary" aria-labelledby="titulo-resumen">
+        <h2 id="titulo-resumen">Resumen del catastro</h2>
+        <dl class="summary-stats">
+          <div><dt>Registros de la selección</dt><dd id="hero-total">—</dd></div>
+          <div><dt>Trabajando</dt><dd id="hero-operating">—</dd></div>
+          <div><dt>Paralizados</dt><dd id="hero-inactive">—</dd></div>
+        </dl>
+      </section>
+
+      <div class="map-grid">
+        <section class="card map-card" aria-labelledby="titulo-mapa">
+          <div class="card-heading">
+            <div>
+              <h2 id="titulo-mapa">Mapa de aserraderos</h2>
+              <p id="map-count" role="status">Cargando coordenadas…</p>
+            </div>
+            <div class="map-actions">
+              <div class="basemap-switch" role="group" aria-label="Mapa base">
+                <button type="button" data-basemap="satelite" aria-pressed="true" aria-controls="map" disabled>Satélite</button>
+                <button type="button" data-basemap="mapa" aria-pressed="false" aria-controls="map" disabled>Mapa</button>
+              </div>
+              <button class="outline-button recenter" id="recenter" type="button" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+                Centrar mapa
+              </button>
+            </div>
+          </div>
+          <div class="map-frame">
+            <div id="map" aria-label="Mapa interactivo de establecimientos de aserrío"></div>
+            <div id="map-message" class="map-message" hidden></div>
+            <p id="imagery-status" class="map-message imagery-status" role="status" hidden></p>
+          </div>
+          <div class="map-legend" aria-label="Simbología">
+            <span><i class="key-dot" aria-hidden="true"></i>Sin observación</span>
+            <span><i class="key-dot review" aria-hidden="true"></i>Requiere revisión</span>
+            <span class="cluster-key"><i class="key-cluster" aria-hidden="true">3</i>Agrupación de registros</span>
+          </div>
+        </section>
+
+        <aside class="card overview" aria-labelledby="titulo-regiones">
+          <div class="overview-header">
+            <h2 id="titulo-regiones">Regiones con más registros</h2>
+            <p>Según los filtros aplicados.</p>
+          </div>
+          <ol id="regional-rank" class="regional-rank"></ol>
+          <button class="review-tile" id="review-shortcut" type="button" aria-pressed="false" disabled>
+            <span class="review-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 16H3l9-16Z"/><path d="M12 9v4m0 3h.01"/></svg>
+            </span>
+            <span><strong id="review-count">—</strong><span>Por verificar</span></span>
+          </button>
+        </aside>
+      </div>
+    </section>
+
+    <section class="directory-section" id="directorio" aria-labelledby="titulo-directorio">
+      <div class="section-heading">
+        <h2 id="titulo-directorio">Directorio de aserraderos</h2>
+        <p class="result-count" id="table-total" role="status">Cargando registros…</p>
+      </div>
+      <div class="card table-card">
+        <div class="table-scroll" tabindex="0" aria-label="Tabla de aserraderos. Desliza para ver todas las columnas.">
+          <table>
+            <caption class="visually-hidden">Directorio de aserraderos del Catastro 2025</caption>
+            <thead>
+              <tr>
+                <th scope="col" data-key="id" aria-sort="ascending"><button class="sort" type="button">ID<span aria-hidden="true"></span></button></th>
+                <th scope="col" data-key="nombre"><button class="sort" type="button">Aserradero<span aria-hidden="true"></span></button></th>
+                <th scope="col" data-key="comuna"><button class="sort" type="button">Comuna y región<span aria-hidden="true"></span></button></th>
+                <th scope="col" data-key="situacion"><button class="sort" type="button">Situación<span aria-hidden="true"></span></button></th>
+                <th scope="col" data-key="movilidad"><button class="sort" type="button">Movilidad<span aria-hidden="true"></span></button></th>
+                <th scope="col" data-key="tipoEspecie"><button class="sort" type="button">Tipo de especie<span aria-hidden="true"></span></button></th>
+                <th scope="col" data-key="revisar"><button class="sort" type="button">Coordenadas<span aria-hidden="true"></span></button></th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <div class="page-size-control">
+            <label for="page-size">Filas por página</label>
+            <span class="select-wrap"><select id="page-size"><option>25</option><option>50</option><option>100</option></select></span>
+          </div>
+          <div class="pagination" aria-label="Paginación">
+            <span id="page-status">—</span>
+            <button id="previous" type="button" class="outline-button" disabled>Anterior</button>
+            <button id="next" type="button" class="outline-button" disabled>Siguiente</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card sources" id="fuentes" aria-labelledby="titulo-fuentes">
+      <div>
+        <h2 id="titulo-fuentes">Sobre el catastro</h2>
+        <p>El Instituto Forestal levantó los datos entre enero y junio de 2026 para caracterizar la actividad de 2025. Cada registro corresponde a un establecimiento. El estudio ofrece una línea base para el Programa CH-L1186 de Apoyo a la Construcción Sostenible.</p>
+        <p>La revisión geográfica contrasta las coordenadas del directorio con la cartografía de referencia. Las observaciones se pueden consultar en cada ficha.</p>
+      </div>
+      <div>
+        <h3>Fuentes</h3>
+        <ul>
+          <li>Informe final del Catastro 2025, INFOR</li>
+          <li>Base directorio de aserraderos 2025</li>
+          <li>Control geográfico de los registros</li>
+          <li><a href="https://geoportal.cl/geoportal/catalog/36391/division-politica-administrativa-2023" target="_blank" rel="noopener">Cartografía DPA 2023, IDE Chile</a></li>
+          <li><a href="https://cloudless.eox.at/license-non-commercial" target="_blank" rel="noopener">Vista satelital Sentinel-2, EOxCloudless 2016–2017</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div><span>Corfo · Gerencia de Estrategia</span><span>Catastro de la industria del aserrío 2025</span></div>
+  </footer>
+
+  <dialog id="plant-dialog" aria-labelledby="plant-name">
+    <div class="dialog-content">
+      <header class="dialog-header">
+        <div><p id="plant-id"></p><h2 id="plant-name"></h2><p id="plant-location"></p></div>
+        <button class="close-button" id="close-dialog" type="button" aria-label="Cerrar ficha" autofocus>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="dialog-body" id="plant-details"></div>
+      <footer class="dialog-footer">
+        <button class="primary-button" id="locate-plant" type="button">Centrar en el mapa</button>
+      </footer>
+    </div>
+  </dialog>
+</body>
+</html>
